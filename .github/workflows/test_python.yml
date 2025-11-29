@@ -1,33 +1,92 @@
-name: Test Python 
-on: [push, pull_request]
+name: Test Python
+on:
+  push:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
-    test:
-      runs-on: ${{ matrix.runner }}
-      strategy:
-        fail-fast: false
-        matrix:
-          runner:
-            - ubuntu-latest
-            - macos-latest
-          python-version:
-            - "3.8"
-            - "3.x"
-      steps:
 
-        - uses: actions/checkout@v6
-          with:
-            submodules: recursive
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04-arm
+          - ubuntu-24.04
+          - macos-15
+          - macos-15-intel
+        python:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+    steps:
 
-        - uses: actions/setup-python@v6
-          with:
-            python-version: ${{ matrix.python-version }}
+    - name: Checkout
+      uses: actions/checkout@v6
 
-        - name: Upgrade pip
-          run: python -m pip install -U pip
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python }}
+        pip-install: build
 
-        - name: Install package for testing
-          run: python -m pip install ".[test]"
+    - name: Build wheel
+      run: python -m build --wheel .
+      env:
+        SKBUILD_WHEEL_PY_API: ${{ matrix.python == '3.12' && 'cp312' || '' }}
 
-        - name: Run tests
-          run: pytest
+    - name: Upload wheel
+      uses: actions/upload-artifact@v5
+      with:
+        name: wheel-${{ runner.os }}-${{ runner.arch }}-${{ matrix.python }}
+        path: dist/*.whl
+        retention-days: 1
+
+  test:
+    needs: [build]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04-arm
+          - ubuntu-24.04
+          - macos-15
+          - macos-15-intel
+        python:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "3.x"
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python }}
+        pip-install: pytest
+
+    - name: Download wheel
+      uses: actions/download-artifact@v6
+      with:
+        path: dist
+        pattern: wheel-${{ runner.os }}-${{ runner.arch }}-*
+        merge-multiple: true
+
+    - name: Install wheel
+      run: python -m pip install mutationpp
+             --find-links=dist
+
+    - name: Test wheel
+      run: pytest

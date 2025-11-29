@@ -1,4 +1,7 @@
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
+
+#define PY_MODULE NB_MODULE
+namespace py = nanobind;
 
 /**
  * This is the module definition for the Mutation++ Python wrapper.
@@ -6,12 +9,10 @@
  * form minimal maintenance effort.
  */
 
-namespace py = pybind11;
+void py_export_MixtureOptions(py::module_ &);
+void py_export_Mixture(py::module_ &);
 
-void py_export_MixtureOptions(py::module &);
-void py_export_Mixture(py::module &);
-
-PYBIND11_MODULE(_mutationpp, m) {
+PY_MODULE(_mutationpp, m) {
     m.doc() = "Mutation++ Python bindings";
     py_export_MixtureOptions(m);
     py_export_Mixture(m);
